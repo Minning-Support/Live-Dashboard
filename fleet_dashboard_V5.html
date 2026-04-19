@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rabotec — Live Fleet Status</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#080b12;
+  --s1:#0e1320;
+  --s2:#131929;
+  --s3:#1a2236;
+  --s4:#1f2840;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.11);
+  --border3:rgba(255,255,255,0.18);
+  --yellow:#F5C300;
+  --yellow2:#e0b000;
+  --red:#CC2200;
+  --red2:#ff3a1a;
+  --blue:#1A5FAB;
+  --blue2:#2578d4;
+  --blue3:#4a9ef5;
+  --green:#22c55e;
+  --green-bg:rgba(34,197,94,0.1);
+  --danger:#ef4444;
+  --danger-bg:rgba(239,68,68,0.1);
+  --neutral:#64748b;
+  --text:#f1f5f9;
+  --text2:#94a3b8;
+  --text3:#475569;
+  --font-head:'Barlow Condensed',sans-serif;
+  --font-body:'Barlow',sans-serif;
+  --font-semi:'Barlow Semi Condensed',sans-serif;
+  --r:12px;--r2:8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;overflow-x:hidden}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 0%,rgba(26,95,171,0.12) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 100%,rgba(245,195,0,0.07) 0%,transparent 55%),
+    radial-gradient(ellipse 30% 30% at 50% 50%,rgba(204,34,0,0.04) 0%,transparent 70%),
+    repeating-linear-gradient(0deg,transparent,transparent 47px,rgba(255,255,255,0.012) 48px),
+    repeating-linear-gradient(90deg,transparent,transparent 47px,rgba(255,255,255,0.012) 48px);
+}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 36px;height:68px;
+  background:rgba(8,11,18,0.95);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border2);
+  position:sticky;top:0;z-index:200;
+}
+.logo-block{display:flex;align-items:center;gap:14px}
+.rabotec-logo{width:46px;height:46px;flex-shrink:0}
+.logo-text-block{display:flex;flex-direction:column}
+.logo-name{
+  font-family:var(--font-head);font-size:28px;font-weight:800;
+  letter-spacing:3px;text-transform:uppercase;line-height:1;
+  background:linear-gradient(90deg,#ffffff 50%,var(--yellow));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.logo-tagline{font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--yellow);margin-top:2px}
+.header-right{display:flex;align-items:center;gap:20px}
+.live-pill{display:flex;align-items:center;gap:7px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:20px;padding:5px 14px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.live-text{font-family:var(--font-semi);font-size:10px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--green)}
+.clock-wrap{text-align:right}
+.clock-time{font-family:var(--font-head);font-size:22px;font-weight:700;letter-spacing:2px;color:var(--text);line-height:1}
+.clock-date{font-size:10px;letter-spacing:1.5px;color:var(--text2);text-transform:uppercase;margin-top:2px}
+
+.nav-wrap{
+  display:flex;align-items:stretch;justify-content:space-between;
+  padding:0 36px;
+  background:rgba(13,19,32,0.8);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+}
+.nav-tabs{display:flex}
+.tab{
+  padding:0 24px;height:50px;
+  font-family:var(--font-semi);font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--text3);cursor:pointer;border:none;background:none;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .2s,border-color .2s;display:flex;align-items:center;gap:8px;
+}
+.tab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
+.tab:hover:not(.active){color:var(--text2)}
+.nav-kpis{display:flex;align-items:center}
+.nav-kpi{display:flex;flex-direction:column;align-items:flex-end;padding:0 20px;border-left:1px solid var(--border);justify-content:center;height:50px}
+.nkpi-val{font-family:var(--font-head);font-size:24px;font-weight:700;letter-spacing:1px;color:var(--text);line-height:1}
+.nkpi-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+
+.page{display:none;padding:28px 36px;animation:fadeUp .25s ease}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.alert-strip{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);
+  border-left:3px solid var(--danger);border-radius:var(--r2);
+  padding:10px 16px;margin-bottom:20px;
+  font-size:12px;font-weight:500;color:#fca5a5;letter-spacing:.3px;
+}
+.alert-strip.hidden{display:none}
+.a-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);flex-shrink:0;animation:blink 1.5s infinite}
+
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.sum-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;
+}
+.sum-card:hover{border-color:var(--border2)}
+.sum-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sum-card.sc-total::after{background:linear-gradient(90deg,var(--blue),var(--blue2))}
+.sum-card.sc-avail::after{background:linear-gradient(90deg,var(--green),rgba(34,197,94,.5))}
+.sum-card.sc-commit::after{background:linear-gradient(90deg,var(--yellow),var(--yellow2))}
+.sum-card.sc-diff::after{background:linear-gradient(90deg,var(--red),var(--red2))}
+.sc-label{font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.sc-val{font-family:var(--font-head);font-size:46px;font-weight:800;letter-spacing:1px;color:var(--text);line-height:1}
+.sc-sub{font-size:11px;color:var(--text3);margin-top:3px}
+
+.eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.eq-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;
+}
+.eq-card:hover{transform:translateY(-2px);border-color:var(--border2);box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.eq-card.st-ok{border-top:3px solid var(--green)}
+.eq-card.st-fail{border-top:3px solid var(--danger)}
+.eq-card.st-none{border-top:3px solid var(--text3)}
+
+.chead{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px 12px;border-bottom:1px solid var(--border);background:var(--s2);
+}
+.icon-box{
+  width:58px;height:58px;flex-shrink:0;
+  background:var(--s3);border:1px solid var(--border2);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;padding:4px;
+}
+.icon-box svg{width:100%;height:100%}
+.chead-name{font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text);line-height:1}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  padding:3px 9px;border-radius:20px;margin-top:5px;
+}
+.sp-ok{background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.sp-fail{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(239,68,68,.2)}
+.sp-none{background:rgba(100,116,139,.1);color:var(--text3);border:1px solid rgba(100,116,139,.15)}
+
+.cmetrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)}
+.cm{background:var(--s1);padding:12px 10px;text-align:center}
+.cm-val{font-family:var(--font-head);font-size:28px;font-weight:700;letter-spacing:1px;color:var(--text);line-height:1}
+.cm-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:4px}
+
+.cbar-wrap{padding:10px 16px 6px}
+.bar-track{height:5px;background:var(--s4);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.bf-ok{background:linear-gradient(90deg,var(--green),rgba(34,197,94,.4))}
+.bf-fail{background:linear-gradient(90deg,var(--danger),rgba(239,68,68,.4))}
+.bf-none{background:var(--s4)}
+.bar-meta{display:flex;justify-content:space-between;margin-top:5px}
+.bar-lbl{font-family:var(--font-semi);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}
+
+.cdiff{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 14px}
+.cdiff-label{font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+.cdiff-right{display:flex;align-items:center;gap:8px}
+.cdiff-val{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:1px;line-height:1}
+.dv-ok{color:var(--green)}.dv-fail{color:var(--danger)}.dv-none{color:var(--text3)}
+.fail-tag{
+  font-family:var(--font-semi);font-size:8px;font-weight:700;letter-spacing:2px;
+  background:var(--danger-bg);color:var(--danger);
+  border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:2px 6px;text-transform:uppercase;
+}
+
+.entry-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.ecard{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .2s}
+.ecard:hover{border-color:var(--border2)}
+.ehead{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--border)}
+.ehead-icon{width:40px;height:40px;flex-shrink:0}
+.ehead-icon svg{width:100%;height:100%}
+.ehead-name{font-family:var(--font-head);font-size:18px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text)}
+.ebody{padding:16px}
+.fields3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-family:var(--font-semi);font-size:8px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3)}
+.fg input{
+  background:var(--s3);border:1px solid var(--border2);border-radius:6px;
+  color:var(--text);font-family:var(--font-head);font-size:20px;font-weight:700;
+  padding:8px 10px;width:100%;outline:none;
+  transition:border-color .2s,background .2s;
+}
+.fg input:focus{border-color:var(--yellow);background:rgba(245,195,0,.04)}
+.fg input::-webkit-inner-spin-button,.fg input::-webkit-outer-spin-button{-webkit-appearance:none}
+.save-btn{
+  width:100%;padding:10px;cursor:pointer;
+  background:rgba(245,195,0,.07);border:1px solid rgba(245,195,0,.2);border-radius:7px;
+  color:var(--yellow);font-family:var(--font-semi);font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;
+  transition:background .2s,border-color .2s,transform .1s;
+}
+.save-btn:hover{background:rgba(245,195,0,.14);border-color:rgba(245,195,0,.38)}
+.save-btn:active{transform:scale(.98)}
+.save-btn.saved{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.25);color:var(--green)}
+
+.phead{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.phead-title{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text)}
+.phead-sub{font-family:var(--font-semi);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:3px}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:3px}
+
+.screenshot-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 18px;cursor:pointer;
+  background:rgba(26,95,171,0.12);
+  border:1px solid rgba(26,95,171,0.35);
+  border-radius:var(--r2);
+  color:var(--blue3);
+  font-family:var(--font-semi);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  transition:background .2s,border-color .2s,transform .1s;
+  white-space:nowrap;
+}
+.screenshot-btn:hover{background:rgba(26,95,171,0.22);border-color:rgba(74,158,245,0.55)}
+.screenshot-btn:active{transform:scale(.97)}
+.screenshot-btn.capturing{
+  background:rgba(245,195,0,0.1);border-color:rgba(245,195,0,0.35);color:var(--yellow);
+  pointer-events:none;
+}
+.screenshot-btn svg{width:14px;height:14px;flex-shrink:0}
+
+.ss-toast{
+  position:fixed;bottom:28px;right:28px;z-index:9999;
+  display:flex;align-items:center;gap:10px;
+  background:var(--s2);border:1px solid var(--border2);border-left:3px solid var(--green);
+  border-radius:var(--r2);padding:12px 18px;
+  font-family:var(--font-semi);font-size:12px;font-weight:500;letter-spacing:.3px;color:var(--text);
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  transform:translateY(80px);opacity:0;
+  transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;
+}
+.ss-toast.show{transform:translateY(0);opacity:1}
+.ss-toast-icon{color:var(--green);font-size:16px;flex-shrink:0}
+
+@media(max-width:680px){
+  header,.nav-wrap,.page{padding-left:14px;padding-right:14px}
+  .summary-bar{grid-template-columns:1fr 1fr}
+  .nav-kpis,.clock-wrap{display:none}
+  .eq-grid,.entry-grid{grid-template-columns:1fr}
+}
+
+/* ═══ HISTORY PAGE ═══ */
+.shift-status-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.shift-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 18px;display:flex;align-items:center;gap:14px;
+  transition:border-color .2s;
+}
+.shift-card:hover{border-color:var(--border2)}
+.shift-card.active-shift{border-color:rgba(245,195,0,.3);background:rgba(245,195,0,.04)}
+.next-sample-card{border-color:rgba(26,95,171,.25);background:rgba(26,95,171,.04)}
+.shift-icon{font-size:26px;flex-shrink:0;opacity:.8}
+.shift-info{flex:1;min-width:0}
+.shift-name{font-family:var(--font-semi);font-size:12px;font-weight:600;letter-spacing:1px;color:var(--text);line-height:1}
+.shift-hours{font-size:10px;letter-spacing:1px;color:var(--text3);margin-top:3px}
+.shift-samples{text-align:right;flex-shrink:0}
+.ss-val{font-family:var(--font-head);font-size:26px;font-weight:700;letter-spacing:1px;color:var(--yellow);line-height:1}
+.ss-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+
+/* History table */
+.hist-table-wrap{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;
+}
+.hist-table-head{
+  display:flex;align-items:stretch;
+  background:var(--s2);border-bottom:1px solid var(--border2);
+  padding:0 16px;min-height:44px;
+}
+.ht-cell{
+  font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;color:var(--text3);
+  display:flex;align-items:center;padding:10px 8px;
+}
+.ht-date{width:110px;flex-shrink:0}
+.ht-eq{flex:1;display:flex;gap:0}
+.ht-eq-col{flex:1;text-align:center;justify-content:center}
+.ht-saved{width:120px;flex-shrink:0;justify-content:flex-end}
+
+/* History row */
+.hist-row{
+  border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.hist-row:last-child{border-bottom:none}
+.hist-row:hover{background:rgba(255,255,255,.02)}
+
+.hist-row-date{
+  display:flex;align-items:center;
+  padding:0 16px;min-height:40px;cursor:pointer;
+  gap:10px;
+}
+.hrd-date{
+  width:110px;flex-shrink:0;
+  font-family:var(--font-semi);font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text);
+}
+.hrd-eq-vals{flex:1;display:flex;gap:0}
+.hrd-col{flex:1;text-align:center;padding:0 4px}
+.hrd-shift{display:flex;flex-direction:column;gap:2px;align-items:center}
+.hrd-shift-val{
+  font-family:var(--font-mono,monospace);font-size:11px;font-weight:500;
+  padding:1px 5px;border-radius:3px;line-height:1.4;min-width:30px;text-align:center;
+}
+.sv-day{background:rgba(245,195,0,.1);color:var(--yellow)}
+.sv-night{background:rgba(26,95,171,.15);color:var(--blue3)}
+.sv-na{color:var(--text3);background:rgba(255,255,255,.04)}
+.hrd-expand{font-size:10px;color:var(--text3);transition:transform .2s;flex-shrink:0}
+.hist-row.expanded .hrd-expand{transform:rotate(180deg)}
+.hrd-saved{width:120px;flex-shrink:0;display:flex;justify-content:flex-end;align-items:center}
+.saved-tag{
+  font-family:var(--font-semi);font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+  padding:3px 8px;border-radius:4px;
+}
+.saved-manual{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.saved-auto{background:rgba(26,95,171,.1);color:var(--blue3);border:1px solid rgba(26,95,171,.2)}
+
+/* Detail expand panel */
+.hist-detail{
+  display:none;border-top:1px solid var(--border);
+  background:var(--s2);padding:16px 20px;
+}
+.hist-row.expanded .hist-detail{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.detail-eq-card{
+  background:var(--s3);border:1px solid var(--border);border-radius:var(--r2);
+  padding:12px 14px;
+}
+.deq-name{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text);margin-bottom:8px}
+.deq-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)}
+.deq-row:last-child{border-bottom:none}
+.deq-lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text3)}
+.deq-vals{display:flex;gap:6px}
+.deq-val{font-family:var(--font-mono,monospace);font-size:12px;font-weight:500;padding:1px 6px;border-radius:3px}
+
+/* Location tags on dashboard card */
+.cm-loc{display:flex;gap:4px;justify-content:center;margin-top:5px;flex-wrap:wrap}
+.loc-tag{
+  font-family:var(--font-mono,monospace);font-size:9px;font-weight:600;
+  padding:2px 6px;border-radius:3px;letter-spacing:.5px;white-space:nowrap;
+}
+.loc-abore{background:rgba(245,195,0,.12);color:var(--yellow);border:1px solid rgba(245,195,0,.2)}
+.loc-esaase{background:rgba(26,95,171,.15);color:var(--blue3);border:1px solid rgba(26,95,171,.25)}
+
+/* Location section in form card */
+.loc-section{
+  margin-top:12px;
+  background:var(--s3);
+  border:1px solid var(--border2);
+  border-radius:var(--r2);
+  overflow:hidden;
+}
+.loc-header{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;
+  background:var(--s4);
+  border-bottom:1px solid var(--border2);
+}
+.loc-pill{
+  font-family:var(--font-semi);font-size:9px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;
+  padding:3px 10px;border-radius:4px;
+}
+.loc-abore-pill{background:rgba(245,195,0,.15);color:var(--yellow);border:1px solid rgba(245,195,0,.3)}
+.loc-esaase-pill{background:rgba(26,95,171,.2);color:var(--blue3);border:1px solid rgba(26,95,171,.35)}
+.loc-divider{flex:1;height:1px;background:var(--border2)}
+.loc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.loc-col{background:var(--s2);padding:10px 12px}
+
+/* Validation error */
+.val-error{
+  display:none;
+  background:rgba(239,68,68,.08);
+  border:1px solid rgba(239,68,68,.3);
+  border-left:3px solid var(--danger);
+  border-radius:var(--r2);
+  padding:8px 12px;
+  margin-top:10px;
+}
+.val-error.show{display:block}
+.val-error-code{
+  font-family:var(--font-mono,monospace);font-size:10px;font-weight:600;
+  letter-spacing:1.5px;color:var(--danger);text-transform:uppercase;margin-bottom:3px;
+}
+.val-error-msg{font-size:11px;color:#fca5a5;line-height:1.5}
+.fg input.input-error{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.05)}
+.fg input.input-warn{border-color:rgba(245,195,0,.5);background:rgba(245,195,0,.04)}
+
+.hist-empty{padding:48px;text-align:center}
+
+/* Samples legend in header */
+.shift-legend{display:flex;gap:14px;align-items:center;margin-bottom:14px}
+.sl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+.sl-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+@media(max-width:900px){
+  .shift-status-bar{grid-template-columns:1fr 1fr}
+}
+
+/* ═══ CONFIGURE PAGE ═══ */
+.cfg-hint{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(26,95,171,.07);border:1px solid rgba(26,95,171,.2);
+  border-radius:var(--r2);padding:10px 16px;margin-bottom:20px;
+  font-size:12px;color:var(--text2);
+}
+.cfg-stats-row{display:flex;gap:16px;margin-bottom:18px}
+.cfg-stat{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);
+  padding:10px 20px;display:flex;align-items:baseline;gap:8px;
+}
+.cfg-stat span:first-child{font-family:var(--font-head);font-size:28px;font-weight:700;color:var(--yellow)}
+.cfg-stat-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+
+#cfg-list{display:flex;flex-direction:column;gap:8px;max-width:640px}
+
+.cfg-row{
+  display:flex;align-items:center;gap:14px;
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);
+  padding:12px 16px;
+  transition:border-color .15s,background .15s,box-shadow .15s;
+  cursor:default;user-select:none;
+}
+.cfg-row.dragging{
+  opacity:.55;border-color:var(--yellow);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.cfg-row.drag-over{
+  border-color:var(--yellow);background:rgba(245,195,0,.06);
+}
+.cfg-row.hidden-card{opacity:.45}
+
+.cfg-handle{
+  color:var(--text3);font-size:18px;cursor:grab;padding:0 4px;
+  line-height:1;flex-shrink:0;letter-spacing:-1px;
+}
+.cfg-handle:active{cursor:grabbing}
+
+.cfg-order{
+  font-family:var(--font-mono,monospace);font-size:11px;font-weight:600;
+  color:var(--text3);min-width:22px;text-align:center;flex-shrink:0;
+}
+
+.cfg-icon{width:38px;height:38px;flex-shrink:0;background:var(--s3);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:4px}
+.cfg-icon svg{width:100%;height:100%}
+
+.cfg-name{flex:1;font-family:var(--font-head);font-size:17px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text)}
+
+/* Toggle switch */
+.cfg-toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.cfg-toggle input{opacity:0;width:0;height:0;position:absolute}
+.cfg-slider{
+  position:absolute;inset:0;border-radius:24px;
+  background:var(--s4);border:1px solid var(--border2);
+  cursor:pointer;transition:background .2s,border-color .2s;
+}
+.cfg-slider::before{
+  content:'';position:absolute;
+  width:18px;height:18px;border-radius:50%;
+  left:2px;top:2px;background:var(--text3);
+  transition:transform .2s,background .2s;
+}
+.cfg-toggle input:checked + .cfg-slider{background:rgba(245,195,0,.2);border-color:rgba(245,195,0,.4)}
+.cfg-toggle input:checked + .cfg-slider::before{transform:translateX(20px);background:var(--yellow)}
+
+.cfg-vis-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;min-width:40px;text-align:right}
+.cfg-vis-on{color:var(--yellow)}
+.cfg-vis-off{color:var(--text3)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="logo-block">
+    <svg class="rabotec-logo" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Hexagon base blue -->
+      <polygon points="23,2 42,12 42,34 23,44 4,34 4,12" fill="#1A5FAB"/>
+      <!-- Inner dark hex -->
+      <polygon points="23,6 38,14.5 38,31.5 23,40 8,31.5 8,14.5" fill="#080b12"/>
+      <!-- Yellow top band -->
+      <polygon points="23,2 42,12 42,15 23,7 4,15 4,12" fill="#F5C300"/>
+      <!-- Red bottom band -->
+      <polygon points="23,44 42,34 42,31 23,39 4,31 4,34" fill="#CC2200"/>
+      <!-- R letter -->
+      <text x="23" y="30" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="20" fill="#ffffff" letter-spacing="0">R</text>
+    </svg>
+    <div class="logo-text-block">
+      <div class="logo-name">Rabotec</div>
+      <div class="logo-tagline">Live Fleet Status</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <span class="live-text">Live</span>
+    </div>
+    <div class="clock-wrap">
+      <div class="clock-time" id="clock-time">00:00:00</div>
+      <div class="clock-date" id="clock-date"></div>
+    </div>
+  </div>
+</header>
+
+<div class="nav-wrap">
+  <div class="nav-tabs">
+    <button class="tab active" onclick="showPage('dashboard',this)">&#9670; Dashboard</button>
+    <button class="tab" onclick="showPage('data',this)">&#8862; Enter Data</button>
+    <button class="tab" onclick="showPage('history',this)">&#9700; History</button>
+    <button class="tab" onclick="showPage('configure',this)">&#9881; Configure</button>
+  </div>
+  <div class="nav-kpis">
+    <div class="nav-kpi"><div class="nkpi-val" id="nk-total">0</div><div class="nkpi-lbl">Total Fleet</div></div>
+    <div class="nav-kpi"><div class="nkpi-val" id="nk-avail">0</div><div class="nkpi-lbl">Available</div></div>
+    <div class="nav-kpi" style="padding-right:0"><div class="nkpi-val" id="nk-alerts" style="color:var(--danger)">0</div><div class="nkpi-lbl">Alerts</div></div>
+  </div>
+</div>
+
+<div id="page-dashboard" class="page active">
+  <div class="phead">
+    <div>
+      <div class="phead-title">Equipment Overview</div>
+      <div class="phead-sub">Real-time commitment tracking — all equipment classes</div>
+    </div>
+    <button class="screenshot-btn" id="ss-btn" onclick="takeScreenshot()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      Export Snapshot
+    </button>
+  </div>
+  <div id="alert-strip" class="alert-strip hidden">
+    <div class="a-dot"></div><span id="alert-text"></span>
+  </div>
+  <div class="summary-bar">
+    <div class="sum-card sc-total"><div class="sc-label">Total Units</div><div class="sc-val" id="s-total">0</div><div class="sc-sub">across all classes</div></div>
+    <div class="sum-card sc-avail"><div class="sc-label">Available</div><div class="sc-val" id="s-avail">0</div><div class="sc-sub">ready to deploy</div></div>
+    <div class="sum-card sc-commit"><div class="sc-label">Committed</div><div class="sc-val" id="s-commit">0</div><div class="sc-sub">currently allocated</div></div>
+    <div class="sum-card sc-diff"><div class="sc-label">Net Difference</div><div class="sc-val" id="s-diff" style="color:var(--text3)">0</div><div class="sc-sub" id="s-diff-sub">available minus committed</div></div>
+  </div>
+  <div class="eq-grid" id="dash-grid"></div>
+</div>
+
+<div id="page-data" class="page">
+  <div class="phead">
+    <div>
+      <div class="phead-title">Data Entry</div>
+      <div class="phead-sub">Update fleet counts — dashboard reflects instantly</div>
+    </div>
+  </div>
+  <div class="entry-grid" id="form-grid"></div>
+</div>
+
+<div id="page-history" class="page">
+  <div class="phead">
+    <div>
+      <div class="phead-title">Fleet History</div>
+      <div class="phead-sub">Daily records — Day &amp; Night shift averages from hourly samples</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="screenshot-btn" id="save-day-btn" onclick="saveCurrentDay()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Today
+      </button>
+      <button class="screenshot-btn" style="border-color:rgba(34,197,94,.25);color:var(--green);background:rgba(34,197,94,.06)" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Excel
+      </button>
+      <button class="screenshot-btn" style="border-color:rgba(26,95,171,.35);color:var(--blue3);background:rgba(26,95,171,.08)" onclick="document.getElementById('import-file').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Excel
+      </button>
+      <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)"/>
+      <button class="screenshot-btn" style="border-color:rgba(239,68,68,.25);color:var(--danger);background:rgba(239,68,68,.06)" onclick="clearHistory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        Clear All
+      </button>
+    </div>
+  </div>
+
+  <!-- Shift status panel -->
+  <div class="shift-status-bar">
+    <div class="shift-card" id="shift-day-card">
+      <div class="shift-icon">&#9728;</div>
+      <div class="shift-info">
+        <div class="shift-name">Day Shift</div>
+        <div class="shift-hours">06:00 — 17:59</div>
+      </div>
+      <div class="shift-samples">
+        <div class="ss-val" id="day-samples">0</div>
+        <div class="ss-lbl">samples today</div>
+      </div>
+    </div>
+    <div class="shift-card" id="shift-night-card">
+      <div class="shift-icon">&#9790;</div>
+      <div class="shift-info">
+        <div class="shift-name">Night Shift</div>
+        <div class="shift-hours">18:00 — 05:59</div>
+      </div>
+      <div class="shift-samples">
+        <div class="ss-val" id="night-samples">0</div>
+        <div class="ss-lbl">samples today</div>
+      </div>
+    </div>
+    <div class="shift-card next-sample-card">
+      <div class="shift-icon">&#9719;</div>
+      <div class="shift-info">
+        <div class="shift-name">Next Auto-Sample</div>
+        <div class="shift-hours">captured every hour</div>
+      </div>
+      <div class="shift-samples">
+        <div class="ss-val" id="next-sample-countdown">—</div>
+        <div class="ss-lbl">minutes remaining</div>
+      </div>
+    </div>
+    <div class="shift-card" style="cursor:pointer" onclick="takeSampleNow()">
+      <div class="shift-icon" style="color:var(--yellow)">&#9654;</div>
+      <div class="shift-info">
+        <div class="shift-name" style="color:var(--yellow)">Manual Sample</div>
+        <div class="shift-hours">capture current values now</div>
+      </div>
+      <div class="shift-samples">
+        <div class="ss-val" id="last-sample-time">—</div>
+        <div class="ss-lbl">last sample</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History table -->
+  <div class="hist-table-wrap">
+    <div class="hist-table-head">
+      <div class="ht-cell ht-date">Date</div>
+      <div class="ht-cell ht-eq" id="hist-eq-headers"></div>
+      <div class="ht-cell ht-saved">Saved</div>
+    </div>
+    <div id="hist-body"></div>
+    <div id="hist-empty" class="hist-empty">
+      <div style="font-size:32px;margin-bottom:12px;opacity:.3">&#9700;</div>
+      <div style="font-size:14px;font-weight:500;color:var(--text3)">No history records yet</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">Samples are captured automatically every hour. Use <strong style="color:var(--text2)">Save Today</strong> to commit today's averages.</div>
+    </div>
+  </div>
+</div>
+
+<div id="page-configure" class="page">
+  <div class="phead">
+    <div>
+      <div class="phead-title">Configure Dashboard</div>
+      <div class="phead-sub">Toggle visibility and drag to reorder equipment cards</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="screenshot-btn" onclick="resetCardConfig()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+        Reset to Default
+      </button>
+      <button class="screenshot-btn" style="border-color:rgba(34,197,94,.25);color:var(--green);background:rgba(34,197,94,.06)" onclick="applyCardConfig()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>
+        Apply &amp; Go to Dashboard
+      </button>
+    </div>
+  </div>
+
+  <div class="cfg-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>Drag cards by the <strong style="color:var(--text2)">&#8801; handle</strong> to reorder. Toggle the switch to show or hide each card on the dashboard.</span>
+  </div>
+
+  <div class="cfg-stats-row">
+    <div class="cfg-stat"><span id="cfg-visible-count">12</span><span class="cfg-stat-lbl">Visible</span></div>
+    <div class="cfg-stat"><span id="cfg-hidden-count">0</span><span class="cfg-stat-lbl">Hidden</span></div>
+  </div>
+
+  <div id="cfg-list"></div>
+</div>
+
+</div>
+<script>
+const EQ=[
+  {id:'dump_truck',name:'Dump Truck'},
+  {id:'grader',name:'Grader'},
+  {id:'crusher',name:'Crusher'},
+  {id:'rock_breaker',name:'Rock Breaker'},
+  {id:'water_pump',name:'Water Pump'},
+  {id:'lighting_plant',name:'Lighting Plant'},
+  {id:'service_truck',name:'Service Truck'},
+  {id:'fuel_truck_1',name:'Fuel Trucks'},
+  {id:'support_excavator',name:'Support Excavator'},
+  {id:'prime_excavator',name:'Prime Excavator'},
+  {id:'drill_rig',name:'Drill Rig'},
+  {id:'bulldozer',name:'Bulldozer'},
+];
+
+const IC={
+dump_truck:`<svg viewBox="0 0 68 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="18" width="22" height="24" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="3,18 11,18 3,28" fill="#1A5FAB"/>
+  <rect x="2" y="32" width="22" height="3.5" fill="#CC2200"/>
+  <rect x="4" y="20" width="13" height="10" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="5" y="21" width="5" height="8" rx=".5" fill="#4a9ef5" opacity=".7"/>
+  <rect x="24" y="12" width="42" height="30" rx="2" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <rect x="24" y="12" width="42" height="4" fill="#d4a800"/>
+  <line x1="33" y1="16" x2="33" y2="42" stroke="#c4980a" stroke-width=".8"/>
+  <line x1="42" y1="16" x2="42" y2="42" stroke="#c4980a" stroke-width=".8"/>
+  <line x1="51" y1="16" x2="51" y2="42" stroke="#c4980a" stroke-width=".8"/>
+  <line x1="60" y1="16" x2="60" y2="42" stroke="#c4980a" stroke-width=".8"/>
+  <rect x="2" y="42" width="64" height="3.5" rx="1" fill="#aab4c4"/>
+  <circle cx="13" cy="48" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="13" cy="48" r="2.5" fill="#3a3e4e"/>
+  <circle cx="32" cy="48" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="32" cy="48" r="2.5" fill="#3a3e4e"/>
+  <circle cx="56" cy="48" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="56" cy="48" r="2.5" fill="#3a3e4e"/>
+</svg>`,
+
+grader:`<svg viewBox="0 0 76 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="8" y="20" width="60" height="20" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <rect x="46" y="10" width="20" height="14" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="47,10 55,10 47,20" fill="#1A5FAB"/>
+  <rect x="46" y="21" width="20" height="3" fill="#CC2200"/>
+  <rect x="48" y="12" width="11" height="7" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <path d="M4 40 L10 30 L66 35 L72 40 Z" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <rect x="32" y="24" width="4" height="10" rx="1" fill="#b0b8c4"/>
+  <rect x="8" y="38" width="60" height="3" rx="1" fill="#aab4c4"/>
+  <circle cx="16" cy="45" r="6" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="16" cy="45" r="2.8" fill="#3a3e4e"/>
+  <circle cx="62" cy="45" r="6" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <circle cx="62" cy="45" r="2.8" fill="#d4a800"/>
+  <circle cx="48" cy="45" r="6" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <circle cx="48" cy="45" r="2.8" fill="#d4a800"/>
+</svg>`,
+
+crusher:`<svg viewBox="0 0 68 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="6" width="36" height="40" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <rect x="6" y="8" width="16" height="16" rx="1" fill="#1A5FAB" opacity=".7"/>
+  <rect x="6" y="26" width="16" height="6" rx="1" fill="#F5C300" opacity=".9"/>
+  <rect x="4" y="24" width="36" height="3.5" fill="#CC2200"/>
+  <rect x="24" y="8" width="14" height="16" rx="1" fill="#1e2230" stroke="#333" stroke-width=".5"/>
+  <line x1="27" y1="8" x2="27" y2="24" stroke="#2a2e38" stroke-width=".8"/>
+  <line x1="31" y1="8" x2="31" y2="24" stroke="#2a2e38" stroke-width=".8"/>
+  <line x1="35" y1="8" x2="35" y2="24" stroke="#2a2e38" stroke-width=".8"/>
+  <line x1="24" y1="13" x2="38" y2="13" stroke="#2a2e38" stroke-width=".8"/>
+  <line x1="24" y1="18" x2="38" y2="18" stroke="#2a2e38" stroke-width=".8"/>
+  <rect x="38" y="18" width="26" height="9" rx="2" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".8" transform="rotate(-20 38 18)"/>
+  <rect x="38" y="19" width="26" height="3.5" rx="1" fill="#CC2200" transform="rotate(-20 38 18)"/>
+  <rect x="4" y="46" width="36" height="4" rx="1" fill="#aab4c4"/>
+  <rect x="4" y="50" width="36" height="6" rx="3" fill="#1e2230"/>
+  <circle cx="10" cy="53" r="3.5" fill="#2a2e38"/>
+  <circle cx="34" cy="53" r="3.5" fill="#2a2e38"/>
+</svg>`,
+
+rock_breaker:`<svg viewBox="0 0 68 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="26" width="34" height="22" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="3,26 12,26 3,37" fill="#1A5FAB"/>
+  <rect x="2" y="38" width="34" height="3.5" fill="#CC2200"/>
+  <rect x="4" y="28" width="14" height="10" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="30" y="8" width="7" height="32" rx="3" fill="#c0c8d4" stroke="#aab4c4" stroke-width=".8" transform="rotate(18 30 8)"/>
+  <rect x="43" y="4" width="5" height="24" rx="2" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".8" transform="rotate(34 43 4)"/>
+  <rect x="48" y="28" width="12" height="24" rx="2" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <rect x="49" y="30" width="10" height="5" rx="1" fill="#d4a800"/>
+  <rect x="51" y="47" width="6" height="7" rx="1" fill="#c4980a"/>
+  <rect x="2" y="48" width="34" height="9" rx="4" fill="#1e2230"/>
+  <circle cx="8" cy="52" r="4" fill="#2a2e38"/>
+  <circle cx="30" cy="52" r="4" fill="#2a2e38"/>
+  <ellipse cx="60" cy="55" rx="5" ry="3" fill="#2a2e38" opacity=".6"/>
+</svg>`,
+
+water_pump:`<svg viewBox="0 0 68 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="20" y="14" width="36" height="26" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <rect x="22" y="16" width="15" height="20" rx="1" fill="#1A5FAB" opacity=".65"/>
+  <rect x="24" y="20" width="9" height="4" rx=".5" fill="#4a9ef5" opacity=".8"/>
+  <rect x="39" y="16" width="7" height="20" rx="1" fill="#F5C300" opacity=".9"/>
+  <rect x="20" y="30" width="36" height="3.5" fill="#CC2200"/>
+  <circle cx="10" cy="27" r="10" fill="none" stroke="#1A5FAB" stroke-width="4"/>
+  <circle cx="10" cy="27" r="4.5" fill="#1A5FAB"/>
+  <rect x="2" y="24" width="10" height="6" rx="3" fill="#14488c"/>
+  <rect x="54" y="18" width="12" height="4" rx="2" fill="#14488c"/>
+  <rect x="54" y="30" width="12" height="4" rx="2" fill="#14488c"/>
+  <rect x="20" y="40" width="36" height="3.5" rx="1" fill="#aab4c4"/>
+  <circle cx="30" cy="48" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="30" cy="48" r="2.5" fill="#3a3e4e"/>
+  <circle cx="48" cy="48" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="48" cy="48" r="2.5" fill="#3a3e4e"/>
+</svg>`,
+
+lighting_plant:`<svg viewBox="0 0 58 62" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="36" width="38" height="22" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <rect x="12" y="38" width="14" height="16" rx="1" fill="#F5C300" opacity=".9"/>
+  <rect x="28" y="38" width="14" height="16" rx="1" fill="#1A5FAB" opacity=".7"/>
+  <rect x="10" y="46" width="38" height="3.5" fill="#CC2200"/>
+  <rect x="27" y="8" width="4" height="30" fill="#9aa0b0"/>
+  <rect x="12" y="4" width="17" height="9" rx="1.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <rect x="31" y="4" width="17" height="9" rx="1.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <rect x="13" y="5" width="6.5" height="7" rx="1" fill="#ffe44d" opacity=".95"/>
+  <rect x="21" y="5" width="6.5" height="7" rx="1" fill="#ffe44d" opacity=".95"/>
+  <rect x="32" y="5" width="6.5" height="7" rx="1" fill="#ffe44d" opacity=".95"/>
+  <rect x="40" y="5" width="6.5" height="7" rx="1" fill="#ffe44d" opacity=".95"/>
+  <rect x="10" y="58" width="38" height="3" rx="1" fill="#aab4c4"/>
+  <circle cx="22" cy="60" r="4" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="22" cy="60" r="1.8" fill="#3a3e4e"/>
+  <circle cx="42" cy="60" r="4" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="42" cy="60" r="1.8" fill="#3a3e4e"/>
+</svg>`,
+
+service_truck:`<svg viewBox="0 0 76 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="16" width="22" height="28" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="3,16 12,16 3,27" fill="#1A5FAB"/>
+  <rect x="2" y="31" width="22" height="3.5" fill="#CC2200"/>
+  <rect x="4" y="18" width="13" height="10" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="24" y="10" width="50" height="34" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="25,10 38,10 25,25" fill="#1A5FAB" opacity=".75"/>
+  <rect x="24" y="32" width="50" height="3.5" fill="#CC2200"/>
+  <rect x="26" y="12" width="20" height="18" rx="1" fill="#c8d0e0" stroke="#b0b8c8" stroke-width=".5"/>
+  <rect x="48" y="12" width="24" height="18" rx="1" fill="#c8d0e0" stroke="#b0b8c8" stroke-width=".5"/>
+  <rect x="60" y="4" width="7" height="10" rx="1" fill="#F5C300"/>
+  <rect x="52" y="6" width="16" height="4" rx="1" fill="#F5C300"/>
+  <rect x="2" y="44" width="72" height="3.5" rx="1" fill="#aab4c4"/>
+  <circle cx="13" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="13" cy="49" r="2.5" fill="#3a3e4e"/>
+  <circle cx="40" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="40" cy="49" r="2.5" fill="#3a3e4e"/>
+  <circle cx="64" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="64" cy="49" r="2.5" fill="#3a3e4e"/>
+</svg>`,
+
+fuel_truck_1:`<svg viewBox="0 0 76 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="18" width="22" height="26" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="3,18 11,18 3,28" fill="#1A5FAB"/>
+  <rect x="2" y="32" width="22" height="3.5" fill="#CC2200"/>
+  <rect x="4" y="20" width="12" height="9" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="24" y="14" width="50" height="28" rx="14" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <clipPath id="tc1"><rect x="24" y="14" width="50" height="28" rx="14"/></clipPath>
+  <rect x="24" y="26" width="50" height="5" fill="#1A5FAB" opacity=".8" clip-path="url(#tc1)"/>
+  <rect x="24" y="34" width="50" height="4.5" fill="#CC2200" opacity=".85" clip-path="url(#tc1)"/>
+  <path d="M50 21 Q50 16 55 19 Q60 22 55 27 Q50 31 50 26 Z" fill="#F5C300" stroke="#d4a800" stroke-width=".5"/>
+  <rect x="60" y="8" width="5" height="8" rx="1" fill="#aab4c4"/>
+  <rect x="2" y="44" width="72" height="3.5" rx="1" fill="#aab4c4"/>
+  <circle cx="13" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="13" cy="49" r="2.5" fill="#3a3e4e"/>
+  <circle cx="43" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="43" cy="49" r="2.5" fill="#3a3e4e"/>
+  <circle cx="64" cy="49" r="5.5" fill="#1e2230" stroke="#333" stroke-width=".8"/>
+  <circle cx="64" cy="49" r="2.5" fill="#3a3e4e"/>
+</svg>`,
+
+support_excavator:`<svg viewBox="0 0 68 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="46" width="50" height="12" rx="5" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+  <circle cx="8" cy="52" r="4.5" fill="#2a2e38"/>
+  <circle cx="46" cy="52" r="4.5" fill="#2a2e38"/>
+  <rect x="8" y="48" width="38" height="8" rx="1" fill="#161a24"/>
+  <rect x="6" y="26" width="38" height="22" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="7,26 17,26 7,38" fill="#1A5FAB"/>
+  <rect x="6" y="38" width="38" height="3.5" fill="#CC2200"/>
+  <rect x="8" y="28" width="15" height="10" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="36" y="14" width="7" height="28" rx="3" fill="#c0c8d4" stroke="#aab4c4" stroke-width=".8" transform="rotate(15 36 14)"/>
+  <rect x="47" y="8" width="5" height="22" rx="2" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".8" transform="rotate(30 47 8)"/>
+  <path d="M54 32 Q62 30 64 37 Q65 44 58 45 Q51 45 51 38 Z" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+</svg>`,
+
+prime_excavator:`<svg viewBox="0 0 72 62" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="50" width="56" height="12" rx="5" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+  <circle cx="8" cy="56" r="5" fill="#2a2e38"/>
+  <circle cx="52" cy="56" r="5" fill="#2a2e38"/>
+  <rect x="8" y="52" width="44" height="8" rx="1" fill="#161a24"/>
+  <rect x="4" y="26" width="48" height="26" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <polygon points="5,26 17,26 5,40" fill="#1A5FAB"/>
+  <rect x="4" y="41" width="48" height="3.5" fill="#CC2200"/>
+  <rect x="6" y="28" width="19" height="12" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="30" y="20" width="20" height="4" rx="1" fill="#F5C300"/>
+  <rect x="30" y="20" width="3" height="10" rx="1" fill="#F5C300"/>
+  <rect x="47" y="20" width="3" height="10" rx="1" fill="#F5C300"/>
+  <rect x="42" y="10" width="8" height="32" rx="3" fill="#c0c8d4" stroke="#aab4c4" stroke-width=".8" transform="rotate(18 42 10)"/>
+  <rect x="54" y="4" width="6" height="28" rx="3" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".8" transform="rotate(32 54 4)"/>
+  <path d="M60 34 Q68 32 70 40 Q71 48 64 50 Q56 50 56 42 Z" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+</svg>`,
+
+drill_rig:`<svg viewBox="0 0 68 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Crawler base / undercarriage -->
+  <rect x="4" y="58" width="60" height="12" rx="5" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+  <circle cx="10" cy="64" r="5" fill="#2a2e38" stroke="#3a3e4e" stroke-width=".8"/>
+  <circle cx="10" cy="64" r="2.2" fill="#3a3e4e"/>
+  <circle cx="58" cy="64" r="5" fill="#2a2e38" stroke="#3a3e4e" stroke-width=".8"/>
+  <circle cx="58" cy="64" r="2.2" fill="#3a3e4e"/>
+  <rect x="10" y="60" width="48" height="8" rx="1" fill="#161a24"/>
+  <!-- Carrier body / house -->
+  <rect x="6" y="40" width="56" height="20" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <!-- Blue diagonal stripe on cab side -->
+  <polygon points="7,40 20,40 7,54" fill="#1A5FAB"/>
+  <!-- Red horizontal band -->
+  <rect x="6" y="52" width="56" height="3.5" fill="#CC2200"/>
+  <!-- Cab window -->
+  <rect x="8" y="42" width="16" height="10" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="9" y="43" width="6" height="8" rx=".5" fill="#4a9ef5" opacity=".7"/>
+  <!-- Engine panel / louvers -->
+  <rect x="28" y="42" width="30" height="10" rx="1" fill="#c8d0e0" stroke="#b0b8c8" stroke-width=".5"/>
+  <line x1="31" y1="42" x2="31" y2="52" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="36" y1="42" x2="36" y2="52" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="41" y1="42" x2="41" y2="52" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="46" y1="42" x2="46" y2="52" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="51" y1="42" x2="51" y2="52" stroke="#aab4c4" stroke-width=".8"/>
+  <!-- Mast / derrick structure -->
+  <!-- Left mast leg -->
+  <rect x="24" y="4" width="5" height="38" rx="1.5" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".5"/>
+  <!-- Right mast leg -->
+  <rect x="39" y="4" width="5" height="38" rx="1.5" fill="#aab4c4" stroke="#9aa0b0" stroke-width=".5"/>
+  <!-- Mast cross braces -->
+  <line x1="24" y1="12" x2="44" y2="12" stroke="#9aa0b0" stroke-width="1.5"/>
+  <line x1="24" y1="20" x2="44" y2="20" stroke="#9aa0b0" stroke-width="1.5"/>
+  <line x1="24" y1="28" x2="44" y2="28" stroke="#9aa0b0" stroke-width="1.5"/>
+  <line x1="24" y1="36" x2="44" y2="36" stroke="#9aa0b0" stroke-width="1.5"/>
+  <!-- Diagonal braces for realism -->
+  <line x1="24" y1="12" x2="44" y2="20" stroke="#b0b8c4" stroke-width=".8" opacity=".7"/>
+  <line x1="44" y1="12" x2="24" y2="20" stroke="#b0b8c4" stroke-width=".8" opacity=".7"/>
+  <line x1="24" y1="20" x2="44" y2="28" stroke="#b0b8c4" stroke-width=".8" opacity=".7"/>
+  <line x1="44" y1="20" x2="24" y2="28" stroke="#b0b8c4" stroke-width=".8" opacity=".7"/>
+  <!-- Mast crown / top cap -->
+  <rect x="20" y="2" width="28" height="6" rx="2" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <!-- Crown pulley -->
+  <circle cx="34" cy="5" r="3" fill="#d4a800" stroke="#c4980a" stroke-width=".8"/>
+  <circle cx="34" cy="5" r="1.2" fill="#b48800"/>
+  <!-- Yellow safety rails on mast platform -->
+  <rect x="22" y="36" width="24" height="3" rx="1" fill="#F5C300"/>
+  <rect x="22" y="36" width="2.5" height="6" rx="1" fill="#F5C300"/>
+  <rect x="43.5" y="36" width="2.5" height="6" rx="1" fill="#F5C300"/>
+  <!-- Drill pipe / kelly bar hanging from crown -->
+  <rect x="32" y="8" width="4" height="32" rx="1" fill="#888fa0" stroke="#777e8e" stroke-width=".5"/>
+  <!-- Drill pipe sections markings -->
+  <line x1="32" y1="15" x2="36" y2="15" stroke="#6a707e" stroke-width="1"/>
+  <line x1="32" y1="22" x2="36" y2="22" stroke="#6a707e" stroke-width="1"/>
+  <line x1="32" y1="29" x2="36" y2="29" stroke="#6a707e" stroke-width="1"/>
+  <!-- Drill bit tip -->
+  <polygon points="30,40 38,40 35,48 33,48" fill="#CC2200"/>
+  <polygon points="33,46 35,46 34,52 34,52" fill="#aa1800"/>
+  <!-- Hydraulic cylinder on side -->
+  <rect x="46" y="28" width="4" height="16" rx="1.5" fill="#c0c8d4" stroke="#aab4c4" stroke-width=".5"/>
+  <rect x="47" y="20" width="2" height="10" rx="1" fill="#9aa0b0"/>
+  <!-- Outrigger / stabiliser left -->
+  <rect x="2" y="54" width="10" height="4" rx="1" fill="#b0b8c4"/>
+  <rect x="2" y="56" width="5" height="8" rx="1" fill="#9aa0b0"/>
+  <!-- Outrigger right -->
+  <rect x="56" y="54" width="10" height="4" rx="1" fill="#b0b8c4"/>
+  <rect x="61" y="56" width="5" height="8" rx="1" fill="#9aa0b0"/>
+</svg>`,
+
+bulldozer:`<svg viewBox="0 0 72 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Track undercarriage -->
+  <rect x="2" y="42" width="68" height="14" rx="6" fill="#1e2230" stroke="#2a2e38" stroke-width=".8"/>
+  <!-- Track rollers -->
+  <circle cx="10" cy="49" r="5" fill="#2a2e38" stroke="#3a3e4e" stroke-width=".8"/>
+  <circle cx="10" cy="49" r="2.2" fill="#3a3e4e"/>
+  <circle cx="24" cy="49" r="3.5" fill="#2a2e38"/>
+  <circle cx="38" cy="49" r="3.5" fill="#2a2e38"/>
+  <circle cx="52" cy="49" r="3.5" fill="#2a2e38"/>
+  <circle cx="62" cy="49" r="5" fill="#2a2e38" stroke="#3a3e4e" stroke-width=".8"/>
+  <circle cx="62" cy="49" r="2.2" fill="#3a3e4e"/>
+  <!-- Track top plate -->
+  <rect x="8" y="43" width="56" height="5" rx="1" fill="#161a24"/>
+  <!-- Main body -->
+  <rect x="14" y="20" width="48" height="24" rx="2" fill="#dde4ef" stroke="#c0c8d8" stroke-width=".8"/>
+  <!-- Blue diagonal stripe on body left -->
+  <polygon points="15,20 26,20 15,33" fill="#1A5FAB"/>
+  <!-- Red horizontal band -->
+  <rect x="14" y="35" width="48" height="3.5" fill="#CC2200"/>
+  <!-- Cab window -->
+  <rect x="40" y="22" width="18" height="12" rx="1" fill="#1A5FAB" opacity=".85"/>
+  <rect x="41" y="23" width="7" height="10" rx=".5" fill="#4a9ef5" opacity=".7"/>
+  <!-- Engine hood louvers -->
+  <rect x="16" y="22" width="22" height="12" rx="1" fill="#c8d0e0" stroke="#b0b8c8" stroke-width=".5"/>
+  <line x1="20" y1="22" x2="20" y2="34" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="25" y1="22" x2="25" y2="34" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="30" y1="22" x2="30" y2="34" stroke="#aab4c4" stroke-width=".8"/>
+  <line x1="35" y1="22" x2="35" y2="34" stroke="#aab4c4" stroke-width=".8"/>
+  <!-- Exhaust pipe -->
+  <rect x="52" y="10" width="4" height="12" rx="2" fill="#9aa0b0" stroke="#888f9e" stroke-width=".5"/>
+  <ellipse cx="54" cy="10" rx="3" ry="1.5" fill="#777e8e"/>
+  <!-- Dozer blade (large yellow front blade) -->
+  <rect x="2" y="28" width="14" height="18" rx="1" fill="#F5C300" stroke="#d4a800" stroke-width=".8"/>
+  <!-- Blade curve/cutting edge -->
+  <path d="M2 44 Q8 48 14 46 L14 44 Z" fill="#d4a800"/>
+  <!-- Blade ribs for structure -->
+  <line x1="2" y1="33" x2="14" y2="33" stroke="#d4a800" stroke-width="1"/>
+  <line x1="2" y1="38" x2="14" y2="38" stroke="#d4a800" stroke-width="1"/>
+  <!-- Blade push arms -->
+  <rect x="12" y="30" width="6" height="3" rx="1" fill="#b0b8c4"/>
+  <rect x="12" y="38" width="6" height="3" rx="1" fill="#b0b8c4"/>
+  <!-- Hydraulic tilt cylinder -->
+  <rect x="6" y="22" width="3" height="8" rx="1" fill="#c0c8d4" stroke="#aab4c4" stroke-width=".5"/>
+  <!-- Rear ripper (optional — adds realism) -->
+  <rect x="60" y="36" width="10" height="6" rx="1" fill="#b0b8c4" stroke="#9aa0b0" stroke-width=".5"/>
+  <path d="M64 42 L62 54 L66 54 L68 42 Z" fill="#888f9e" stroke="#777" stroke-width=".5"/>
+</svg>`,
+};
+
+const KEY=id=>'rabotec_v3_'+id;
+const EMPTY=()=>({total:0,available:0,committed:0,avail_abore:0,avail_esaase:0,commit_abore:0,commit_esaase:0});
+
+/* ── Pre-load values from screenshot ── */
+(function seedData(){
+  const seed={
+    dump_truck:      {total:40, available:30, committed:34, avail_abore:25, avail_esaase:5,  commit_abore:29, commit_esaase:5},
+    grader:          {total:3,  available:1,  committed:3,  avail_abore:1,  avail_esaase:0,  commit_abore:2,  commit_esaase:1},
+    crusher:         {total:4,  available:3,  committed:4,  avail_abore:3,  avail_esaase:0,  commit_abore:4,  commit_esaase:0},
+    rock_breaker:    {total:2,  available:0,  committed:1,  avail_abore:0,  avail_esaase:0,  commit_abore:1,  commit_esaase:0},
+    water_pump:      {total:6,  available:4,  committed:6,  avail_abore:3,  avail_esaase:1,  commit_abore:5,  commit_esaase:1},
+    lighting_plant:  {total:32, available:18, committed:32, avail_abore:12, avail_esaase:6,  commit_abore:26, commit_esaase:6},
+    service_truck:   {total:3,  available:1,  committed:3,  avail_abore:0,  avail_esaase:1,  commit_abore:2,  commit_esaase:1},
+    fuel_truck_1:    {total:3,  available:3,  committed:3,  avail_abore:2,  avail_esaase:1,  commit_abore:2,  commit_esaase:1},
+    support_excavator:{total:2, available:1,  committed:2,  avail_abore:1,  avail_esaase:0,  commit_abore:2,  commit_esaase:0},
+    prime_excavator: {total:10, available:8,  committed:10, avail_abore:6,  avail_esaase:2,  commit_abore:8,  commit_esaase:2},
+    drill_rig:       {total:12, available:12, committed:12, avail_abore:10, avail_esaase:2,  commit_abore:10, commit_esaase:2},
+    bulldozer:       {total:0,  available:0,  committed:0,  avail_abore:0,  avail_esaase:0,  commit_abore:0,  commit_esaase:0},
+  };
+  Object.entries(seed).forEach(([id,data])=>{
+    const k='rabotec_v3_'+id;
+    // Only seed if no data exists yet for this key
+    if(!localStorage.getItem(k)) localStorage.setItem(k,JSON.stringify(data));
+  });
+})();
+function load(id){
+  try{
+    const d=JSON.parse(localStorage.getItem(KEY(id)));
+    if(!d) return EMPTY();
+    // back-compat: ensure location fields exist
+    return Object.assign(EMPTY(),d);
+  }catch(e){return EMPTY();}
+}
+function save(id,data){try{localStorage.setItem(KEY(id),JSON.stringify(data))}catch(e){}}
+const diff=d=>d.available-d.committed;
+
+function updateSummary(){
+  let T={total:0,available:0,committed:0},alerts=0;
+  EQ.forEach(eq=>{const d=load(eq.id);T.total+=d.total;T.available+=d.available;T.committed+=d.committed;if(diff(d)<0)alerts++});
+  const nd=T.available-T.committed;
+  document.getElementById('s-total').textContent=T.total;
+  document.getElementById('s-avail').textContent=T.available;
+  document.getElementById('s-commit').textContent=T.committed;
+  const sdEl=document.getElementById('s-diff');
+  sdEl.textContent=nd>=0?'+'+nd:nd;
+  sdEl.style.color=nd<0?'var(--danger)':nd>0?'var(--green)':'var(--text3)';
+  document.getElementById('s-diff-sub').textContent=nd<0?'over committed':nd>0?'capacity available':'balanced';
+  document.getElementById('nk-total').textContent=T.total;
+  document.getElementById('nk-avail').textContent=T.available;
+  document.getElementById('nk-alerts').textContent=alerts;
+  const strip=document.getElementById('alert-strip');
+  if(alerts>0){
+    strip.classList.remove('hidden');
+    document.getElementById('alert-text').textContent=alerts+' equipment class'+(alerts>1?'es':'')+' with failed commitments — committed units exceed available units.';
+  }else strip.classList.add('hidden');
+}
+
+function renderDash(){
+  const g=document.getElementById('dash-grid');g.innerHTML='';
+  // Respect configured order and visibility
+  const cfg = getOrderedVisibleEQ();
+  const visibleIds = cfg.filter(c=>c.visible).map(c=>c.id);
+  const orderedEQ = visibleIds.map(id=>EQ.find(eq=>eq.id===id)).filter(Boolean);
+
+  orderedEQ.forEach(eq=>{
+    const d=load(eq.id);
+    const df=diff(d);
+    const isNeg=df<0;
+    const hasData=d.available>0||d.committed>0;
+    const pct=d.available>0?Math.min(100,Math.round((d.committed/d.available)*100)):0;
+    const st=!hasData?'st-none':isNeg?'st-fail':'st-ok';
+    const sp=!hasData?'sp-none':isNeg?'sp-fail':'sp-ok';
+    const badge=!hasData?'No Data':isNeg?'&#9888; Failed Commitment':'&#10003; On Track';
+    const bf=!hasData?'bf-none':isNeg?'bf-fail':'bf-ok';
+    const dvc=isNeg?'dv-fail':hasData?'dv-ok':'dv-none';
+    const arrow=isNeg?'&#9660;':df>0?'&#9650;':'&mdash;';
+    const card=document.createElement('div');
+    card.className='eq-card '+st;
+    card.innerHTML=`
+      <div class="chead">
+        <div class="icon-box">${IC[eq.id]||''}</div>
+        <div>
+          <div class="chead-name">${eq.name}</div>
+          <span class="status-pill ${sp}">${badge}</span>
+        </div>
+      </div>
+      <div class="cmetrics">
+        <div class="cm"><div class="cm-val">${d.total}</div><div class="cm-lbl">Total</div></div>
+        <div class="cm">
+          <div class="cm-val">${d.available}</div><div class="cm-lbl">Available</div>
+          <div class="cm-loc"><span class="loc-tag loc-abore">AB ${d.avail_abore}</span><span class="loc-tag loc-esaase">ES ${d.avail_esaase}</span></div>
+        </div>
+        <div class="cm">
+          <div class="cm-val">${d.committed}</div><div class="cm-lbl">Committed</div>
+          <div class="cm-loc"><span class="loc-tag loc-abore">AB ${d.commit_abore}</span><span class="loc-tag loc-esaase">ES ${d.commit_esaase}</span></div>
+        </div>
+      </div>
+      <div class="cbar-wrap">
+        <div class="bar-track"><div class="bar-fill ${bf}" style="width:${pct}%"></div></div>
+        <div class="bar-meta"><span class="bar-lbl">Committed vs Available</span><span class="bar-lbl">${pct}%</span></div>
+      </div>
+      <div class="cdiff">
+        <span class="cdiff-label">Difference (Avail &minus; Committed)</span>
+        <div class="cdiff-right">
+          <span class="cdiff-val ${dvc}">${arrow} ${Math.abs(df)}</span>
+          ${isNeg?'<span class="fail-tag">Failed</span>':''}
+        </div>
+      </div>`;
+    g.appendChild(card);
+  });
+  updateSummary();
+}
+
+function renderForms(){
+  const g=document.getElementById('form-grid');g.innerHTML='';
+  EQ.forEach(eq=>{
+    const d=load(eq.id);
+    const card=document.createElement('div');card.className='ecard';
+    card.innerHTML=`
+      <div class="ehead">
+        <div class="ehead-icon">${IC[eq.id]||''}</div>
+        <span class="ehead-name">${eq.name}</span>
+      </div>
+      <div class="ebody">
+        <div class="fields3">
+          <div class="fg"><label>Total units</label><input type="number" min="0" value="${d.total}" data-id="${eq.id}" data-field="total" oninput="validateCard('${eq.id}')"/></div>
+          <div class="fg"><label>Available (total)</label><input type="number" min="0" value="${d.available}" data-id="${eq.id}" data-field="available" oninput="validateCard('${eq.id}')"/></div>
+          <div class="fg"><label>Committed (total)</label><input type="number" min="0" value="${d.committed}" data-id="${eq.id}" data-field="committed" oninput="validateCard('${eq.id}')"/></div>
+        </div>
+        <div class="loc-section">
+          <div class="loc-header">
+            <span class="loc-pill loc-abore-pill">Abore</span>
+            <span class="loc-divider"></span>
+            <span class="loc-pill loc-esaase-pill">Esaase</span>
+          </div>
+          <div class="loc-grid">
+            <div class="loc-col">
+              <div class="fg"><label>&#9728; Available — Abore</label><input type="number" min="0" value="${d.avail_abore}" data-id="${eq.id}" data-field="avail_abore" oninput="validateCard('${eq.id}')"/></div>
+              <div class="fg" style="margin-top:8px"><label>&#9830; Committed — Abore</label><input type="number" min="0" value="${d.commit_abore}" data-id="${eq.id}" data-field="commit_abore" oninput="validateCard('${eq.id}')"/></div>
+            </div>
+            <div class="loc-col">
+              <div class="fg"><label>&#9728; Available — Esaase</label><input type="number" min="0" value="${d.avail_esaase}" data-id="${eq.id}" data-field="avail_esaase" oninput="validateCard('${eq.id}')"/></div>
+              <div class="fg" style="margin-top:8px"><label>&#9830; Committed — Esaase</label><input type="number" min="0" value="${d.commit_esaase}" data-id="${eq.id}" data-field="commit_esaase" oninput="validateCard('${eq.id}')"/></div>
+            </div>
+          </div>
+        </div>
+        <div class="val-error" id="verr-${eq.id}">
+          <div class="val-error-code" id="verr-code-${eq.id}"></div>
+          <div class="val-error-msg" id="verr-msg-${eq.id}"></div>
+        </div>
+        <button class="save-btn" data-save="${eq.id}">Save Changes</button>
+      </div>`;
+    g.appendChild(card);
+  });
+  document.getElementById('form-grid').addEventListener('click',e=>{
+    const btn=e.target.closest('[data-save]');if(!btn)return;
+    const id=btn.dataset.save;
+    const obj={};
+    document.querySelectorAll(`input[data-id="${id}"]`).forEach(i=>{obj[i.dataset.field]=parseInt(i.value)||0});
+    const err=getValidationError(obj,id);
+    if(err){
+      showValidationError(id,err.code,err.msg);
+      showToast('ERR '+err.code+' — '+err.shortMsg,'error');
+      return;
+    }
+    clearValidationError(id);
+    save(id,obj);
+    btn.textContent='&#10003; Saved';btn.classList.add('saved');
+    setTimeout(()=>{btn.textContent='Save Changes';btn.classList.remove('saved')},1500);
+  });
+}
+
+/* ═══ INPUT VALIDATION ═══ */
+function getValidationError(obj, id){
+  const t=obj.total, a=obj.available, c=obj.committed;
+  const aa=obj.avail_abore||0, ae=obj.avail_esaase||0;
+  const ca=obj.commit_abore||0, ce=obj.commit_esaase||0;
+  const eq=EQ.find(e=>e.id===id);
+  const name=eq?eq.name:id;
+
+  if(t<0||a<0||c<0||aa<0||ae<0||ca<0||ce<0){
+    return {
+      code:'E001',
+      shortMsg:'Negative values not allowed',
+      msg:`All values must be zero or positive. Check all fields for <em>${name}</em>.`
+    };
+  }
+  if(a > t){
+    return {
+      code:'E002',
+      shortMsg:'Available exceeds Total',
+      msg:`Available units (${a}) cannot be greater than Total units (${t}). You have <strong>${a-t} unit${(a-t)>1?'s':''} over the limit</strong> for <em>${name}</em>.`
+    };
+  }
+  if(c > t){
+    return {
+      code:'E003',
+      shortMsg:'Committed exceeds Total',
+      msg:`Committed units (${c}) cannot be greater than Total units (${t}). You have <strong>${c-t} unit${(c-t)>1?'s':''} over the limit</strong> for <em>${name}</em>.`
+    };
+  }
+  if(aa+ae > a && a>0){
+    return {
+      code:'E004',
+      shortMsg:'Location Available exceeds Total Available',
+      msg:`Abore (${aa}) + Esaase (${ae}) = ${aa+ae}, which exceeds Total Available (${a}) by <strong>${aa+ae-a} unit${(aa+ae-a)>1?'s':''}</strong> for <em>${name}</em>. Adjust location values or increase Total Available.`
+    };
+  }
+  if(ca+ce > c && c>0){
+    return {
+      code:'E005',
+      shortMsg:'Location Committed exceeds Total Committed',
+      msg:`Abore (${ca}) + Esaase (${ce}) = ${ca+ce}, which exceeds Total Committed (${c}) by <strong>${ca+ce-c} unit${(ca+ce-c)>1?'s':''}</strong> for <em>${name}</em>. Adjust location values or increase Total Committed.`
+    };
+  }
+  return null;
+}
+
+function showValidationError(id, code, msg){
+  const box=document.getElementById('verr-'+id);
+  const codeEl=document.getElementById('verr-code-'+id);
+  const msgEl=document.getElementById('verr-msg-'+id);
+  if(!box)return;
+  codeEl.textContent='Error '+code;
+  msgEl.innerHTML=msg;
+  box.classList.add('show');
+  // Highlight offending inputs
+  const inputs=document.querySelectorAll(`input[data-id="${id}"]`);
+  inputs.forEach(i=>i.classList.add('input-error'));
+}
+
+function clearValidationError(id){
+  const box=document.getElementById('verr-'+id);
+  if(box) box.classList.remove('show');
+  document.querySelectorAll(`input[data-id="${id}"]`).forEach(i=>{
+    i.classList.remove('input-error','input-warn');
+  });
+}
+
+function validateCard(id){
+  const obj={};
+  document.querySelectorAll(`input[data-id="${id}"]`).forEach(i=>{obj[i.dataset.field]=parseInt(i.value)||0});
+  const err=getValidationError(obj,id);
+  if(err){
+    showValidationError(id,err.code,err.msg);
+  }else{
+    clearValidationError(id);
+    // Soft warning: either value is above 90% of total (valid but tight)
+    const t=obj.total,a=obj.available,c=obj.committed;
+    if(t>0 && (a/t>0.9 || c/t>0.9)){
+      document.querySelectorAll(`input[data-id="${id}"]`).forEach(i=>i.classList.add('input-warn'));
+    }
+  }
+}
+
+function showPage(p,btn){
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(p==='dashboard')renderDash();
+  if(p==='history')renderHistory();
+  if(p==='configure')renderConfigure();
+}
+
+/* ═══════════════════════════════════════
+   CARD CONFIG: visibility + order
+═══════════════════════════════════════ */
+const CFG_KEY = 'rabotec_card_cfg_v1';
+
+function loadCardConfig(){
+  try{
+    const raw = localStorage.getItem(CFG_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  // Default: all visible, EQ order
+  return EQ.map((eq,i)=>({id:eq.id, visible:true, order:i}));
+}
+
+function saveCardConfig(cfg){
+  try{localStorage.setItem(CFG_KEY, JSON.stringify(cfg));}catch(e){}
+}
+
+function getOrderedVisibleEQ(){
+  const cfg = loadCardConfig();
+  // Merge: ensure any new EQ entries are included
+  const cfgMap = {};
+  cfg.forEach(c=>{ cfgMap[c.id]=c; });
+  EQ.forEach((eq,i)=>{ if(!cfgMap[eq.id]) cfgMap[eq.id]={id:eq.id,visible:true,order:cfg.length+i}; });
+  return Object.values(cfgMap).sort((a,b)=>a.order-b.order);
+}
+
+/* ── Drag state ── */
+let dragSrc = null;
+
+function renderConfigure(){
+  const cfg = getOrderedVisibleEQ();
+  const list = document.getElementById('cfg-list');
+  list.innerHTML = '';
+
+  let visCount = cfg.filter(c=>c.visible).length;
+  document.getElementById('cfg-visible-count').textContent = visCount;
+  document.getElementById('cfg-hidden-count').textContent = cfg.length - visCount;
+
+  cfg.forEach((c, idx)=>{
+    const eq = EQ.find(e=>e.id===c.id);
+    if(!eq) return;
+    const row = document.createElement('div');
+    row.className = 'cfg-row' + (c.visible ? '' : ' hidden-card');
+    row.dataset.id = c.id;
+    row.draggable = true;
+
+    row.innerHTML = `
+      <span class="cfg-handle" title="Drag to reorder">&#8801;</span>
+      <span class="cfg-order">${idx+1}</span>
+      <div class="cfg-icon">${IC[c.id]||''}</div>
+      <span class="cfg-name">${eq.name}</span>
+      <label class="cfg-toggle" title="${c.visible?'Hide':'Show'} on dashboard">
+        <input type="checkbox" ${c.visible?'checked':''} onchange="toggleCardVisibility('${c.id}',this.checked)"/>
+        <span class="cfg-slider"></span>
+      </label>
+      <span class="cfg-vis-label ${c.visible?'cfg-vis-on':'cfg-vis-off'}" id="vis-lbl-${c.id}">${c.visible?'ON':'OFF'}</span>`;
+
+    // Drag events
+    row.addEventListener('dragstart', e=>{
+      dragSrc = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', ()=>{
+      row.classList.remove('dragging');
+      document.querySelectorAll('.cfg-row').forEach(r=>r.classList.remove('drag-over'));
+      persistOrder();
+    });
+    row.addEventListener('dragover', e=>{
+      e.preventDefault();
+      if(row !== dragSrc){
+        document.querySelectorAll('.cfg-row').forEach(r=>r.classList.remove('drag-over'));
+        row.classList.add('drag-over');
+      }
+    });
+    row.addEventListener('drop', e=>{
+      e.preventDefault();
+      if(dragSrc && dragSrc !== row){
+        const allRows = [...list.querySelectorAll('.cfg-row')];
+        const srcIdx = allRows.indexOf(dragSrc);
+        const dstIdx = allRows.indexOf(row);
+        if(srcIdx < dstIdx) row.after(dragSrc);
+        else row.before(dragSrc);
+        row.classList.remove('drag-over');
+        updateOrderNumbers();
+      }
+    });
+
+    list.appendChild(row);
+  });
+}
+
+function updateOrderNumbers(){
+  document.querySelectorAll('.cfg-row').forEach((row, idx)=>{
+    const num = row.querySelector('.cfg-order');
+    if(num) num.textContent = idx+1;
+  });
+}
+
+function toggleCardVisibility(id, visible){
+  const cfg = getOrderedVisibleEQ();
+  const entry = cfg.find(c=>c.id===id);
+  if(entry) entry.visible = visible;
+  saveCardConfig(cfg);
+  // Update label
+  const lbl = document.getElementById('vis-lbl-'+id);
+  if(lbl){ lbl.textContent = visible?'ON':'OFF'; lbl.className='cfg-vis-label '+(visible?'cfg-vis-on':'cfg-vis-off'); }
+  const row = document.querySelector(`.cfg-row[data-id="${id}"]`);
+  if(row) row.classList.toggle('hidden-card', !visible);
+  // Update counts
+  const allCfg = getOrderedVisibleEQ();
+  const vis = allCfg.filter(c=>c.visible).length;
+  const visEl=document.getElementById('cfg-visible-count');
+  const hidEl=document.getElementById('cfg-hidden-count');
+  if(visEl) visEl.textContent=vis;
+  if(hidEl) hidEl.textContent=allCfg.length-vis;
+}
+
+function persistOrder(){
+  const rows = [...document.querySelectorAll('.cfg-row')];
+  const existing = getOrderedVisibleEQ();
+  const cfgMap = {};
+  existing.forEach(c=>{ cfgMap[c.id]=c; });
+  const newCfg = rows.map((row,idx)=>{
+    const id = row.dataset.id;
+    return { id, visible: cfgMap[id]?.visible ?? true, order: idx };
+  });
+  saveCardConfig(newCfg);
+}
+
+function applyCardConfig(){
+  persistOrder();
+  // Navigate to dashboard
+  const dashBtn = document.querySelector('.tab[onclick*="dashboard"]');
+  showPage('dashboard', dashBtn);
+}
+
+function resetCardConfig(){
+  localStorage.removeItem(CFG_KEY);
+  renderConfigure();
+  showToast('Card layout reset to default');
+}
+
+/* ═══════════════════════════════════════════════════
+   HISTORY SYSTEM
+   - Hourly samples stored in localStorage
+   - Shift = DAY (06:00–17:59) | NIGHT (18:00–05:59)
+   - saveCurrentDay() computes avg per shift and commits
+═══════════════════════════════════════════════════ */
+const SAMPLES_KEY = 'rabotec_samples_v1';
+const HISTORY_KEY = 'rabotec_history_v1';
+
+function getShift(hour){ return (hour>=6 && hour<=17) ? 'day' : 'night'; }
+
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function loadSamples(){
+  try{return JSON.parse(localStorage.getItem(SAMPLES_KEY))||{};}catch(e){return {};}
+}
+function saveSamplesStore(s){try{localStorage.setItem(SAMPLES_KEY,JSON.stringify(s));}catch(e){}}
+
+function loadHistoryStore(){
+  try{return JSON.parse(localStorage.getItem(HISTORY_KEY))||[];}catch(e){return [];}
+}
+function saveHistoryStore(h){try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h));}catch(e){}}
+
+/* Take one sample of current fleet data */
+function takeSample(){
+  const now = new Date();
+  const dateKey = todayStr();
+  const hour = now.getHours();
+  const shift = getShift(hour);
+  const sampleTime = now.toTimeString().slice(0,5);
+  const samples = loadSamples();
+  if(!samples[dateKey]) samples[dateKey]={day:[],night:[]};
+  const snap = {};
+  EQ.forEach(eq=>{ snap[eq.id]=load(eq.id); });
+  samples[dateKey][shift].push({ time:sampleTime, hour, data:snap });
+  saveSamplesStore(samples);
+  // Update last sample time display
+  const el=document.getElementById('last-sample-time');
+  if(el) el.textContent=sampleTime;
+  updateShiftStatus();
+  showToast('Sample captured — '+shift+' shift @ '+sampleTime);
+}
+
+function takeSampleNow(){
+  takeSample();
+  // Auto-commit today's averages to history so the record appears immediately
+  const dateKey = todayStr();
+  const samples = loadSamples();
+  const daySamples  = (samples[dateKey]||{}).day  || [];
+  const nightSamples= (samples[dateKey]||{}).night|| [];
+  if(daySamples.length===0 && nightSamples.length===0) return;
+  const history = loadHistoryStore();
+  const existIdx = history.findIndex(r=>r.date===dateKey);
+  const record = {
+    date: dateKey,
+    savedAt: new Date().toISOString(),
+    savedBy: 'manual',
+    day:   computeShiftAvg(daySamples),
+    night: computeShiftAvg(nightSamples),
+  };
+  if(existIdx>=0) history[existIdx]=record;
+  else history.unshift(record);
+  saveHistoryStore(history);
+  // Refresh history page if it is currently visible
+  if(document.getElementById('page-history').classList.contains('active')) renderHistory();
+}
+
+/* Compute shift average from samples array */
+function computeShiftAvg(samplesArr){
+  if(!samplesArr||samplesArr.length===0) return null;
+  const totals={};
+  EQ.forEach(eq=>{ totals[eq.id]={total:0,available:0,committed:0}; });
+  samplesArr.forEach(s=>{
+    EQ.forEach(eq=>{
+      const d=s.data[eq.id]||{total:0,available:0,committed:0};
+      totals[eq.id].total+=d.total;
+      totals[eq.id].available+=d.available;
+      totals[eq.id].committed+=d.committed;
+    });
+  });
+  const n=samplesArr.length;
+  const avg={};
+  EQ.forEach(eq=>{
+    avg[eq.id]={
+      total: Math.round(totals[eq.id].total/n),
+      available: Math.round(totals[eq.id].available/n),
+      committed: Math.round(totals[eq.id].committed/n),
+    };
+  });
+  return {avg, sampleCount:n};
+}
+
+/* Save today's record to history */
+function saveCurrentDay(){
+  const dateKey = todayStr();
+  const samples = loadSamples();
+  const daySamples = (samples[dateKey]||{}).day||[];
+  const nightSamples = (samples[dateKey]||{}).night||[];
+
+  if(daySamples.length===0 && nightSamples.length===0){
+    showToast('No samples captured today yet — use Manual Sample first','error');
+    return;
+  }
+
+  const history = loadHistoryStore();
+  // Check if already saved today — update it
+  const existIdx = history.findIndex(r=>r.date===dateKey);
+  const record = {
+    date: dateKey,
+    savedAt: new Date().toISOString(),
+    savedBy: 'manual',
+    day: computeShiftAvg(daySamples),
+    night: computeShiftAvg(nightSamples),
+  };
+
+  if(existIdx>=0) history[existIdx]=record;
+  else history.unshift(record);
+
+  saveHistoryStore(history);
+  renderHistory();
+  showToast('Today\'s record saved to history');
+}
+
+/* Clear all history */
+function clearHistory(){
+  if(!confirm('Clear all history records? This cannot be undone.')) return;
+  saveHistoryStore([]);
+  saveSamplesStore({});
+  renderHistory();
+  showToast('History cleared');
+}
+
+/* Update shift status panel */
+function updateShiftStatus(){
+  const dateKey = todayStr();
+  const samples = loadSamples();
+  const today = samples[dateKey]||{day:[],night:[]};
+  const dayEl=document.getElementById('day-samples');
+  const nightEl=document.getElementById('night-samples');
+  if(dayEl) dayEl.textContent=today.day.length;
+  if(nightEl) nightEl.textContent=today.night.length;
+  const hour=new Date().getHours();
+  const shift=getShift(hour);
+  document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('active-shift'));
+  const activeCard=shift==='day'?document.getElementById('shift-day-card'):document.getElementById('shift-night-card');
+  if(activeCard) activeCard.classList.add('active-shift');
+  // Next sample countdown
+  const now=new Date();
+  const nextHour=new Date(now);
+  nextHour.setHours(now.getHours()+1,0,0,0);
+  const minsLeft=Math.round((nextHour-now)/60000);
+  const cntEl=document.getElementById('next-sample-countdown');
+  if(cntEl) cntEl.textContent=minsLeft;
+  // Last sample time
+  const allToday=[...today.day,...today.night].sort((a,b)=>a.hour-b.hour);
+  const lastEl=document.getElementById('last-sample-time');
+  if(lastEl) lastEl.textContent=allToday.length>0?allToday[allToday.length-1].time:'—';
+}
+
+/* Format date nicely */
+function fmtDate(dateStr){
+  const [y,m,d]=dateStr.split('-');
+  const dt=new Date(+y,+m-1,+d);
+  return dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+}
+
+/* Render the history page */
+function renderHistory(){
+  updateShiftStatus();
+  const history=loadHistoryStore();
+  const body=document.getElementById('hist-body');
+  const empty=document.getElementById('hist-empty');
+  if(!body) return;
+
+  // Build eq column headers dynamically
+  const hdrs=document.getElementById('hist-eq-headers');
+  if(hdrs){
+    hdrs.innerHTML='';
+    EQ.forEach(eq=>{
+      const c=document.createElement('div');
+      c.className='ht-cell ht-eq-col';
+      c.textContent=eq.name;
+      c.style.cssText='flex:1;text-align:center;justify-content:center;font-size:8px';
+      hdrs.appendChild(c);
+    });
+  }
+
+  if(history.length===0){
+    body.innerHTML='';
+    if(empty) empty.style.display='block';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  body.innerHTML='';
+
+  history.forEach((rec,idx)=>{
+    const row=document.createElement('div');
+    row.className='hist-row';
+
+    // Build eq value columns
+    let eqCols='';
+    EQ.forEach(eq=>{
+      const dv = rec.day ? (rec.day.avg[eq.id]||{}) : null;
+      const nv = rec.night ? (rec.night.avg[eq.id]||{}) : null;
+      const dDiff = dv ? dv.available-dv.committed : null;
+      const nDiff = nv ? nv.available-nv.committed : null;
+      const dayHtml = dv ? `<span class="hrd-shift-val sv-day" title="Day: Avail ${dv.available} / Comm ${dv.committed}">${dv.available}/${dv.committed}</span>` : `<span class="hrd-shift-val sv-na">—</span>`;
+      const nightHtml = nv ? `<span class="hrd-shift-val sv-night" title="Night: Avail ${nv.available} / Comm ${nv.committed}">${nv.available}/${nv.committed}</span>` : `<span class="hrd-shift-val sv-na">—</span>`;
+      eqCols+=`<div class="hrd-col"><div class="hrd-shift">${dayHtml}${nightHtml}</div></div>`;
+    });
+
+    // Build detail panel
+    let detailCards='';
+    EQ.forEach(eq=>{
+      const dv=rec.day?rec.day.avg[eq.id]:null;
+      const nv=rec.night?rec.night.avg[eq.id]:null;
+      const dn=rec.day?rec.day.sampleCount:0;
+      const nn=rec.night?rec.night.sampleCount:0;
+      const dDiff=dv?dv.available-dv.committed:null;
+      const nDiff=nv?nv.available-nv.committed:null;
+      detailCards+=`<div class="detail-eq-card">
+        <div class="deq-name">${eq.name}</div>
+        <div class="deq-row">
+          <span class="deq-lbl">&#9728; Day (${dn} samples)</span>
+          <div class="deq-vals">
+            ${dv?`<span class="deq-val sv-day" title="Total">T:${dv.total}</span><span class="deq-val sv-day" title="Available">A:${dv.available}</span><span class="deq-val sv-day" title="Committed">C:${dv.committed}</span><span class="deq-val ${dDiff<0?'diff-fail':'diff-ok'}" title="Diff">${dDiff>=0?'+':''}${dDiff}</span>`:'<span class="deq-val sv-na">No data</span>'}
+          </div>
+        </div>
+        <div class="deq-row">
+          <span class="deq-lbl">&#9790; Night (${nn} samples)</span>
+          <div class="deq-vals">
+            ${nv?`<span class="deq-val sv-night" title="Total">T:${nv.total}</span><span class="deq-val sv-night" title="Available">A:${nv.available}</span><span class="deq-val sv-night" title="Committed">C:${nv.committed}</span><span class="deq-val ${nDiff<0?'diff-fail':'diff-ok'}" title="Diff">${nDiff>=0?'+':''}${nDiff}</span>`:'<span class="deq-val sv-na">No data</span>'}
+          </div>
+        </div>
+      </div>`;
+    });
+
+    const savedTime=rec.savedAt?new Date(rec.savedAt).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}):'';
+    row.innerHTML=`
+      <div class="hist-row-date" onclick="toggleHistRow(this)">
+        <div class="hrd-date">${fmtDate(rec.date)}</div>
+        <div class="hrd-eq-vals">${eqCols}</div>
+        <div class="hrd-saved">
+          <span class="saved-tag ${rec.savedBy==='manual'?'saved-manual':'saved-auto'}">${savedTime}</span>
+        </div>
+        <div class="hrd-expand">&#9660;</div>
+      </div>
+      <div class="hist-detail">
+        <div style="display:flex;gap:14px;margin-bottom:12px;align-items:center">
+          <div class="sl-item"><div class="sl-dot" style="background:rgba(245,195,0,.4)"></div>&#9728; Day shift avg (avail/committed)</div>
+          <div class="sl-item"><div class="sl-dot" style="background:rgba(26,95,171,.4)"></div>&#9790; Night shift avg (avail/committed)</div>
+          <div style="margin-left:auto;font-size:10px;color:var(--text3)">T=Total · A=Available · C=Committed · Diff=A−C</div>
+        </div>
+        <div class="detail-grid">${detailCards}</div>
+      </div>`;
+    body.appendChild(row);
+  });
+}
+
+function toggleHistRow(el){
+  el.closest('.hist-row').classList.toggle('expanded');
+}
+
+/* ═══ AUTO-SAMPLING: every hour on the hour ═══ */
+function autoSampleAndCommit(){
+  takeSample();
+  // Also auto-commit the running averages to history
+  const dateKey = todayStr();
+  const samples = loadSamples();
+  const daySamples  = (samples[dateKey]||{}).day  || [];
+  const nightSamples= (samples[dateKey]||{}).night|| [];
+  if(daySamples.length>0 || nightSamples.length>0){
+    const history = loadHistoryStore();
+    const existIdx = history.findIndex(r=>r.date===dateKey);
+    const record = {
+      date: dateKey,
+      savedAt: new Date().toISOString(),
+      savedBy: 'auto',
+      day:   computeShiftAvg(daySamples),
+      night: computeShiftAvg(nightSamples),
+    };
+    if(existIdx>=0) history[existIdx]=record;
+    else history.unshift(record);
+    saveHistoryStore(history);
+  }
+  if(document.getElementById('page-history').classList.contains('active')) renderHistory();
+}
+
+function scheduleHourlySample(){
+  const now=new Date();
+  const msToNextHour=(60-now.getMinutes())*60000 - now.getSeconds()*1000 - now.getMilliseconds();
+  setTimeout(()=>{
+    autoSampleAndCommit();
+    setInterval(autoSampleAndCommit, 3600000);
+  },msToNextHour);
+}
+
+scheduleHourlySample();
+
+function updateClock(){
+  const now=new Date();
+  document.getElementById('clock-time').textContent=now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clock-date').textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+}
+
+renderDash();renderForms();updateClock();setInterval(updateClock,1000);
+setInterval(()=>{ if(document.getElementById('page-history').classList.contains('active')) updateShiftStatus(); },60000);
+
+async function takeScreenshot(){
+  const btn=document.getElementById('ss-btn');
+  btn.classList.add('capturing');
+  btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;animation:spin .8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Capturing...`;
+
+  // Temporarily make sticky header static so full page renders correctly
+  const header=document.querySelector('header');
+  const nav=document.querySelector('.nav-wrap');
+  const origHPos=header.style.position;
+  const origNPos=nav.style.position;
+  header.style.position='relative';
+  nav.style.position='relative';
+
+  try{
+    const target=document.getElementById('page-dashboard');
+    const canvas=await html2canvas(document.body,{
+      backgroundColor:'#080b12',
+      scale:2,
+      useCORS:true,
+      allowTaint:true,
+      logging:false,
+      windowWidth:document.body.scrollWidth,
+      windowHeight:document.body.scrollHeight,
+      scrollY:0,
+      scrollX:0,
+    });
+    const now=new Date();
+    const ts=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'_'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
+    const link=document.createElement('a');
+    link.download='Rabotec_Fleet_Status_'+ts+'.png';
+    link.href=canvas.toDataURL('image/png',1.0);
+    link.click();
+    showToast('Snapshot saved as PNG successfully');
+  }catch(err){
+    showToast('Could not capture — try again','error');
+  }finally{
+    header.style.position=origHPos;
+    nav.style.position=origNPos;
+    btn.classList.remove('capturing');
+    btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Export Snapshot`;
+  }
+}
+
+function showToast(msg,type){
+  let t=document.getElementById('ss-toast');
+  if(!t){
+    t=document.createElement('div');t.id='ss-toast';t.className='ss-toast';
+    t.innerHTML='<span class="ss-toast-icon">&#10003;</span><span id="ss-toast-msg"></span>';
+    document.body.appendChild(t);
+  }
+  if(type==='error'){t.style.borderLeftColor='var(--danger)';t.querySelector('.ss-toast-icon').style.color='var(--danger)';t.querySelector('.ss-toast-icon').textContent='✕';}
+  else{t.style.borderLeftColor='var(--green)';t.querySelector('.ss-toast-icon').style.color='var(--green)';t.querySelector('.ss-toast-icon').textContent='✓';}
+  document.getElementById('ss-toast-msg').textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/* ═══════════════════════════════════════════════
+   EXCEL EXPORT
+   Sheet 1 — "History Summary": one row per date/shift
+   Sheet 2 — "Equipment Detail": one row per date/shift/equipment
+   Sheet 3 — "Equipment List": reference of all equipment IDs
+═══════════════════════════════════════════════ */
+function exportExcel(){
+  const history = loadHistoryStore();
+  if(history.length===0){
+    showToast('No history records to export yet','error');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  wb.Props = { Title:'Rabotec Fleet History', Author:'Rabotec Fleet Command' };
+
+  /* ── Sheet 1: Summary ── */
+  const summaryRows = [
+    ['Date','Shift','Samples','Equipment','Total (avg)','Available (avg)','Committed (avg)','Difference (Avail-Comm)','Saved At']
+  ];
+  history.forEach(rec=>{
+    ['day','night'].forEach(shift=>{
+      const sd = rec[shift];
+      if(!sd) return;
+      EQ.forEach(eq=>{
+        const d = sd.avg[eq.id]||{total:0,available:0,committed:0};
+        summaryRows.push([
+          rec.date,
+          shift==='day'?'Day (06:00-17:59)':'Night (18:00-05:59)',
+          sd.sampleCount,
+          eq.name,
+          d.total,
+          d.available,
+          d.committed,
+          d.available - d.committed,
+          rec.savedAt ? new Date(rec.savedAt).toLocaleString() : ''
+        ]);
+      });
+    });
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
+
+  // Column widths
+  ws1['!cols'] = [
+    {wch:14},{wch:22},{wch:10},{wch:22},
+    {wch:14},{wch:16},{wch:16},{wch:22},{wch:22}
+  ];
+
+  // Header style (bold row 1)
+  const range1 = XLSX.utils.decode_range(ws1['!ref']);
+  for(let C=range1.s.c; C<=range1.e.c; C++){
+    const addr = XLSX.utils.encode_cell({r:0,c:C});
+    if(!ws1[addr]) continue;
+    ws1[addr].s = {font:{bold:true},fill:{fgColor:{rgb:'1A5FAB'}},font:{bold:true,color:{rgb:'FFFFFF'}}};
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws1, 'Fleet History');
+
+  /* ── Sheet 2: Daily totals pivot (date vs equipment, available/committed side by side) ── */
+  const pivotHeader = ['Date','Shift','Samples'];
+  EQ.forEach(eq=>{ pivotHeader.push(eq.name+' — Avail', eq.name+' — Commit', eq.name+' — Diff'); });
+  const pivotRows = [pivotHeader];
+
+  history.forEach(rec=>{
+    ['day','night'].forEach(shift=>{
+      const sd = rec[shift];
+      if(!sd) return;
+      const row = [
+        rec.date,
+        shift==='day'?'Day':'Night',
+        sd.sampleCount
+      ];
+      EQ.forEach(eq=>{
+        const d = sd.avg[eq.id]||{total:0,available:0,committed:0};
+        row.push(d.available, d.committed, d.available-d.committed);
+      });
+      pivotRows.push(row);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(pivotRows);
+  ws2['!cols'] = [{wch:14},{wch:10},{wch:10},...EQ.flatMap(()=>[{wch:14},{wch:14},{wch:10}])];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Pivot View');
+
+  /* ── Sheet 3: Equipment Reference ── */
+  const refRows = [['ID','Name'],  ...EQ.map(eq=>[eq.id, eq.name])];
+  const ws3 = XLSX.utils.aoa_to_sheet(refRows);
+  ws3['!cols'] = [{wch:22},{wch:26}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Equipment Reference');
+
+  /* ── Download ── */
+  const now = new Date();
+  const ts = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  XLSX.writeFile(wb, 'Rabotec_Fleet_History_'+ts+'.xlsx');
+  showToast('Excel exported — '+history.length+' day record'+(history.length>1?'s':''));
+}
+
+/* ═══════════════════════════════════════════════
+   EXCEL IMPORT
+   Reads the "Fleet History" sheet written by exportExcel.
+   Merges records: existing dates are updated, new dates appended.
+   Handles both fresh import and re-import of partial backups.
+═══════════════════════════════════════════════ */
+function importExcel(input){
+  const file = input.files[0];
+  if(!file){ return; }
+  input.value=''; // reset so same file can be re-selected
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'uint8array'});
+
+      // Expect "Fleet History" sheet
+      const sheetName = wb.SheetNames.includes('Fleet History') ? 'Fleet History'
+                       : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      if(rows.length < 2){
+        showToast('File appears empty or unrecognised format','error');
+        return;
+      }
+
+      // Parse header row to find column indices
+      const hdr = rows[0].map(h=>String(h).trim());
+      const ci = {
+        date:   hdr.indexOf('Date'),
+        shift:  hdr.indexOf('Shift'),
+        samples:hdr.indexOf('Samples'),
+        eq:     hdr.indexOf('Equipment'),
+        total:  hdr.indexOf('Total (avg)'),
+        avail:  hdr.indexOf('Available (avg)'),
+        commit: hdr.indexOf('Committed (avg)'),
+        savedAt:hdr.indexOf('Saved At'),
+      };
+
+      if(ci.date<0 || ci.shift<0 || ci.eq<0){
+        showToast('Unrecognised format — use a file exported from this dashboard','error');
+        return;
+      }
+
+      // Build a map: date -> {day:{avg:{...},sampleCount}, night:{...}, savedAt}
+      const importMap = {};
+      for(let i=1;i<rows.length;i++){
+        const r = rows[i];
+        if(!r[ci.date]) continue;
+        const dateKey = String(r[ci.date]).trim();
+        const shiftRaw = String(r[ci.shift]).toLowerCase();
+        const shift = shiftRaw.startsWith('day') ? 'day' : 'night';
+        const eqName = String(r[ci.eq]).trim();
+        const eq = EQ.find(e=>e.name===eqName || e.id===eqName);
+        if(!eq) continue;
+
+        if(!importMap[dateKey]) importMap[dateKey]={
+          date:dateKey,
+          savedAt: r[ci.savedAt] ? new Date(r[ci.savedAt]).toISOString() : new Date().toISOString(),
+          savedBy:'import',
+          day:null, night:null
+        };
+
+        if(!importMap[dateKey][shift]){
+          importMap[dateKey][shift]={
+            sampleCount: parseInt(r[ci.samples])||0,
+            avg:{}
+          };
+        }
+        importMap[dateKey][shift].avg[eq.id] = {
+          total:   parseFloat(r[ci.total])||0,
+          available: parseFloat(r[ci.avail])||0,
+          committed: parseFloat(r[ci.commit])||0,
+        };
+      }
+
+      const importedDates = Object.keys(importMap);
+      if(importedDates.length===0){
+        showToast('No valid records found in the file','error');
+        return;
+      }
+
+      // Merge into existing history
+      const history = loadHistoryStore();
+      let added=0, updated=0;
+      importedDates.forEach(dateKey=>{
+        const idx = history.findIndex(r=>r.date===dateKey);
+        if(idx>=0){ history[idx]=importMap[dateKey]; updated++; }
+        else{ history.push(importMap[dateKey]); added++; }
+      });
+
+      // Sort descending by date
+      history.sort((a,b)=>b.date.localeCompare(a.date));
+      saveHistoryStore(history);
+      renderHistory();
+      showToast('Imported: '+added+' new, '+updated+' updated record'+(added+updated>1?'s':''));
+    }catch(err){
+      console.error(err);
+      showToast('Import failed — check file format','error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</body>
+</html>
